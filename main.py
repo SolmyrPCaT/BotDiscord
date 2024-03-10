@@ -9,6 +9,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from typing import Dict, Any
+import json
 
 
 load_dotenv()
@@ -16,6 +17,9 @@ load_dotenv()
 DICTABOT_TOKEN = os.getenv("DICTABOT_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 EVENT_CHECKING_CHANNEL_ID = int(os.getenv("EVENT_CHECKING_CHANNEL_ID"))
+# Emplacement du fichier JSON pour stocker les inscrits
+JSON_FILE_PATH = "registrations.json"
+
 
 intents = discord.Intents.default()
 intents.members = True
@@ -29,9 +33,12 @@ async def on_ready():
     print("Le bot est prêt")
     await check_event_registrations()
 
-registrations = []
 
 async def check_event_registrations():
+    def serialize_datetime(obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        raise TypeError("Type not serializable")
 
     def rank(dictionary: Dict[str, Any]) -> Dict[str, int]:
         sorted_items = sorted(dictionary.items(), key=lambda x: x[1])
@@ -47,53 +54,68 @@ async def check_event_registrations():
 
         guild = bot.get_guild(GUILD_ID)  # GUILD_ID par l'ID de votre serveur
         current_time = datetime.now()
-        registrations = dict() # Pour un event, on a l'identifiant en clé et en valeur un dictionnaire avec l'identifiant de l'user en clé et la date d'inscription en valeur
+        try:
+            with open(JSON_FILE_PATH, "r") as file:
+                registrations = json.load(file)
+        except FileNotFoundError:
+            registrations = {}
 
         if guild:
             scheduled_events = sorted(guild.scheduled_events, key=lambda x: x.start_time)
             for event in scheduled_events:
-                current_users_ids = set([user.id async for user in event.users()])
-                if event.id in registrations:
-                    prev_user_ids = set([user for user in registrations[event.id].keys()])
+                current_users_ids = set([str(user.id) async for user in event.users()])
+                event_id = str(event.id)
+                print(event_id)
+                if event_id in registrations:
+                    prev_user_ids = set([user for user in registrations[event_id].keys()])
                 else:
                     prev_user_ids = set()
 
                 users_in = current_users_ids.difference(prev_user_ids)
                 users_out = prev_user_ids.difference(current_users_ids)
-                # pprint(users_in)
-                # pprint(users_out)
+                print("users_in: ", users_in)
+                print("users_out: ", users_out)
                 if users_out:
                     # Les enlever de registrations
                     for user in users_out:
-                        registrations[event.id].pop(user, None)
+                        registrations[event_id].pop(user, None)
                 elif users_in:
-                    if event.id not in registrations:
-                        registrations[event.id] = {}
+                    if event_id not in registrations:
+                        registrations[event_id] = {}
                     for user in users_in:
-                        if user not in registrations[event.id]:
-                            registrations[event.id][user] = current_time
+                        if user not in registrations[event_id]:
+                            registrations[event_id][user] = current_time
                 else:
                     print(f"{event.name} : No Changes")
 
         # print("Enregistrements :\n", registrations)
 
+        with open(JSON_FILE_PATH, "w") as file:
+            json.dump(registrations, file, indent=4, default=serialize_datetime)
+
         for event_id, users_dict in registrations.items():
-            event = guild.get_scheduled_event(event_id)
+            event = guild.get_scheduled_event(int(event_id))
             event_name = event.name if event else f"Événement inconnu (ID: {event_id})"
 
-            sorted_users = sorted(users_dict.items(), key=lambda x: x[1])  # Trier par date d'inscription
+            sorted_users = sorted(users_dict.items(), key=lambda x: datetime.fromisoformat(x[1])) # Trier par date d'inscription
             ranks = rank(dict(sorted_users))
 
             message = f"## Ordre d'inscription : {event_name} :\n \n"
 
             for user_id, registration_time in sorted_users:
                 rank_str = str(ranks[user_id])
+                user_id = int(user_id)
+                # Convertir la chaîne en objet datetime si nécessaire
+                if not isinstance(registration_time, datetime):
+                    registration_time = datetime.fromisoformat(registration_time)
+
                 # Obtenez l'objet membre
                 member = guild.get_member(user_id)
                 # Utilisez le pseudo si le membre est trouvé, sinon utilisez l'ID
                 user_name = member.name if member else f"Utilisateur inconnu (ID: {user_id})"
                 formatted_registration_time = registration_time.strftime("%d/%m/%Y %H:%M")
-                message += f"{rank_str} {user_name} inscrit le {formatted_registration_time}\n"
+                message += f" {rank_str} -- {user_name} inscrit le {formatted_registration_time}\n"
+
             # Envoyer le message dans le canal de votre choix
             message += "--------------------------------------------------------------------------------"
             channel = bot.get_channel(EVENT_CHECKING_CHANNEL_ID)  # Remplacez YOUR_CHANNEL_ID par l'ID de votre canal
@@ -101,7 +123,7 @@ async def check_event_registrations():
 
         await asyncio.sleep(180)  # Attendre 3 minutes (180 secondes)
 
-        # await asyncio.sleep(180)  # Attendre 1 heure (3600 secondes)
+        # await asyncio.sleep(180)  # Attendre 1 heure (7200 secondes)
 
 
 bot.run(DICTABOT_TOKEN)
