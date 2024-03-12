@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 import json
 
+from utils import write_log_entry
 
 load_dotenv()
 
@@ -23,7 +24,6 @@ intents.members = True
 intents.guild_scheduled_events = True
 
 bot = commands.Bot(command_prefix='$', intents=intents)
-my_guild = bot.get_guild(GUILD_ID)  # GUILD_ID par l'ID de votre serveur
 
 
 @bot.event
@@ -45,6 +45,8 @@ async def check_event_registrations():
     except FileNotFoundError:
         registrations = {}
 
+    my_guild = bot.get_guild(GUILD_ID)
+
     if my_guild:
         scheduled_events = sorted(my_guild.scheduled_events, key=lambda x: x.start_time)
         for event in scheduled_events:
@@ -55,19 +57,25 @@ async def check_event_registrations():
                 prev_user_ids = set([user for user in registrations[event_id].keys()])
             else:
                 prev_user_ids = set()
-
             users_in = current_users_ids.difference(prev_user_ids)
             users_out = prev_user_ids.difference(current_users_ids)
             if users_out:
-                # Les enlever de registrations
-                for user in users_out:
-                    registrations[event_id].pop(user, None)
+                for user_id in users_out:
+                    registrations[event_id].pop(user_id, None)
+                    event_name = event.name if event else f"Événement inconnu (ID: {event_id})"
+                    member = my_guild.get_member(int(user_id))
+                    user_name = member.name if member else f"Utilisateur inconnu (ID: {user_id})"
+                    await write_log_entry(event_name, user_name, "se désinscrit", current_time)
             elif users_in:
                 if event_id not in registrations:
                     registrations[event_id] = {}
-                for user in users_in:
-                    if user not in registrations[event_id]:
-                        registrations[event_id][user] = current_time
+                for user_id in users_in:
+                    if user_id not in registrations[event_id]:
+                        registrations[event_id][user_id] = current_time
+                        event_name = event.name if event else f"Événement inconnu (ID: {event_id})"
+                        member = my_guild.get_member(int(user_id))
+                        user_name = member.name if member else f"Utilisateur inconnu (ID: {user_id})"
+                        await write_log_entry(event_name, user_name, "s'inscrit", current_time)
             else:
                 print(f"{event.name} : No Changes")
 
