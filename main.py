@@ -39,11 +39,16 @@ async def check_event_registrations():
         raise TypeError("Type not serializable")
 
     current_time = datetime.now()
+
     try:
         with open(JSON_FILE_PATH, "r") as file:
             registrations = json.load(file)
     except FileNotFoundError:
         registrations = {}
+        print(f"Le fichier {JSON_FILE_PATH} n'a pas été trouvé.")
+    except json.JSONDecodeError as e:
+        registrations = {}
+        print(f"Erreur lors de la lecture du fichier JSON : {e}")
 
     my_guild = bot.get_guild(GUILD_ID)
 
