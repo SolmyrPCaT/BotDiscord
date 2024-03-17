@@ -56,34 +56,42 @@ async def check_event_registrations():
     if my_guild:
         scheduled_events = sorted(my_guild.scheduled_events, key=lambda x: x.start_time)
         for event in scheduled_events:
-            current_users_ids = set([str(user.id) async for user in event.users()])
+
+            now = datetime.now()
             event_id = str(event.id)
-            print(f"Event {event_id}")
-            if event_id in registrations:
-                prev_user_ids = set([user for user in registrations[event_id].keys()])
+            # print(f"Event {event_id}")
+
+            # Delete previous events
+            if event.start_time > now:
+                del registrations['event_id']
             else:
-                prev_user_ids = set()
-            users_in = current_users_ids.difference(prev_user_ids)
-            users_out = prev_user_ids.difference(current_users_ids)
-            if users_out:
-                for user_id in users_out:
-                    registrations[event_id].pop(user_id, None)
-                    event_name = event.name if event else f"Événement inconnu (ID: {event_id})"
-                    member = my_guild.get_member(int(user_id))
-                    user_name = member.name if member else f"Utilisateur inconnu (ID: {user_id})"
-                    await write_log_entry(event_name, user_name, "se désinscrit", current_time)
-            elif users_in:
-                if event_id not in registrations:
-                    registrations[event_id] = {}
-                for user_id in users_in:
-                    if user_id not in registrations[event_id]:
-                        registrations[event_id][user_id] = current_time
+                current_users_ids = set([str(user.id) async for user in event.users()])
+                if event_id in registrations:
+                    prev_user_ids = set([user for user in registrations[event_id].keys()])
+                else:
+                    prev_user_ids = set()
+
+                users_in = current_users_ids.difference(prev_user_ids)
+                users_out = prev_user_ids.difference(current_users_ids)
+                if users_out:
+                    for user_id in users_out:
+                        registrations[event_id].pop(user_id, None)
                         event_name = event.name if event else f"Événement inconnu (ID: {event_id})"
                         member = my_guild.get_member(int(user_id))
                         user_name = member.name if member else f"Utilisateur inconnu (ID: {user_id})"
-                        await write_log_entry(event_name, user_name, "s'inscrit", current_time)
-            else:
-                print(f"{event.name} : No Changes")
+                        await write_log_entry(event_name, user_name, "se désinscrit", current_time)
+                elif users_in:
+                    if event_id not in registrations:
+                        registrations[event_id] = {}
+                    for user_id in users_in:
+                        if user_id not in registrations[event_id]:
+                            registrations[event_id][user_id] = current_time
+                            event_name = event.name if event else f"Événement inconnu (ID: {event_id})"
+                            member = my_guild.get_member(int(user_id))
+                            user_name = member.name if member else f"Utilisateur inconnu (ID: {user_id})"
+                            await write_log_entry(event_name, user_name, "s'inscrit", current_time)
+                else:
+                    print(f"{event.name} : No Changes")
 
     with open(JSON_FILE_PATH, "w") as file:
         json.dump(registrations, file, indent=4, default=serialize_datetime)
