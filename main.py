@@ -1,6 +1,6 @@
 import os
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands
@@ -39,7 +39,7 @@ async def check_event_registrations():
             return obj.isoformat()
         raise TypeError("Type not serializable")
 
-    current_time = datetime.now()
+    current_time = datetime.now(timezone.utc)
 
     try:
         with open(JSON_FILE_PATH, "r") as file:
@@ -57,13 +57,13 @@ async def check_event_registrations():
         scheduled_events = sorted(my_guild.scheduled_events, key=lambda x: x.start_time)
         for event in scheduled_events:
 
-            now = datetime.now()
             event_id = str(event.id)
             # print(f"Event {event_id}")
 
             # Delete previous events
-            if event.start_time > now:
-                del registrations['event_id']
+            if event.start_time > current_time:
+                if event_id in registrations.keys():
+                    del registrations[event_id]
             else:
                 current_users_ids = set([str(user.id) async for user in event.users()])
                 if event_id in registrations:
