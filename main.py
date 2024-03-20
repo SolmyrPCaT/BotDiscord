@@ -41,4 +41,4 @@ async def event_users(ctx, event_id: int):
     await ctx.send(message)
 
 
-bot.run(os.getenv("DICTABOT_TOKEN"))
+bot.run(DICTABOT_TOKEN)
