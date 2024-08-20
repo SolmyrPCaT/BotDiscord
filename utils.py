@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-LOG_FILE_PATH = "registration_log.txt"
+LOG_FILE_PATH = "data/registration_log.txt"
 
 
 async def write_log_entry(guild, event, user_id, action, timestamp):

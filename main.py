@@ -9,7 +9,7 @@ load_dotenv()
 DICTABOT_TOKEN = os.getenv("DICTABOT_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 EVENT_CHECKING_CHANNEL_ID = int(os.getenv("EVENT_CHECKING_CHANNEL_ID"))
-JSON_FILE_PATH = "registrations.json"
+JSON_FILE_PATH = "data/registrations.json"
 
 
 intents = discord.Intents.default()
